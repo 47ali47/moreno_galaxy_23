@@ -1,0 +1,231 @@
+
+import h5py
+import numpy as np
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import matplotlib.colors as colors
+from matplotlib.colors import LogNorm
+import copy
+from matplotlib import rc
+plt.rcParams['font.family'] = 'serif'
+
+
+class component_graphs:
+ 
+    def __init__(self):
+        
+        #container for searching
+        self.h = 0.7
+        self.particle_data = {}
+        self._read_data()
+        
+################### PRIVATE FUNCTIONS #######################
+
+    def _read_data(self):
+    
+        read_path = '/Users/anboli/Documents/marckie/object_3094.hdf5'
+        
+        f = h5py.File(read_path,'r')
+    
+        #Retrieving specific data and putting it into a container
+        
+        self.particle_data['dm_x'] = np.asarray(f['dm_x'])
+        self.particle_data['dm_y'] = np.asarray(f['dm_y'])
+        self.particle_data['dm_z'] = np.asarray(f['dm_z'])
+        self.particle_data['dm_mass'] = np.asarray(f['dm_mass'])*1e10/self.h
+       
+        self.particle_data['gas_x'] = np.asarray(f['gas_x'])
+        self.particle_data['gas_y'] = np.asarray(f['gas_y'])
+        self.particle_data['gas_z'] = np.asarray(f['gas_z'])
+        self.particle_data['gas_mass'] = np.asarray(f['gas_mass'])*1e10/self.h
+        
+        self.particle_data['stars_x'] = np.asarray(f['stars_x'])
+        self.particle_data['stars_y'] = np.asarray(f['stars_y'])
+        self.particle_data['stars_z'] = np.asarray(f['stars_z'])
+        self.particle_data['stars_mass'] = np.asarray(f['stars_mass'])*1e10/self.h
+        
+    
+        f.close()
+  
+#######################Public_Functions#########################
+
+#this will set the input of plots to whatever variables are put in to var_1 and 2 respectively from the client
+    
+    def data_arrange(self, component, var_1_name, var_2_name, color, symbol, size, weight):
+        
+        #setting up the input variables
+        var_1 = self.particle_data[component+'_'+var_1_name]
+        var_2 = self.particle_data[component+'_'+var_2_name]
+        weights = self.particle_data[component+'_'+weight]
+    
+        
+        #code for the graph
+        norm = colors.LogNorm(vmin=1e4,vmax=1e10)
+        bins = 1024
+        cmap = 'nipy_spectral'
+        cmap = copy.copy(mpl.cm.get_cmap(cmap))
+        hist, x_edges, y_edges = np.histogram2d(var_1, var_2, bins = bins, weights = weights)
+        #code to plot
+        FOV = 18
+        length = 2.*FOV/bins
+        area = length**2
+        hist = hist/area
+        Units = '$M_\u2609$'+' '+ r'$kpc^{-2}$'
+        
+        plt.imshow(hist, origin = 'lower', extent = [x_edges[0], x_edges[-1], y_edges[0], y_edges[-1]], aspect = 'auto', cmap = cmap, norm = norm)
+        hist[hist==0]=1
+        cmap.set_bad('black')
+        #plotting the circles
+        
+        
+        #inner circle
+        theta = np.linspace(0,2 * np.pi, 100)
+        radius = self.radius_inner
+        x = radius * np.cos(theta)
+        y = radius * np.sin(theta)
+        plt.plot(x,y)
+        
+        
+        
+        #outer circle
+        theta_1 = np.linspace(0,2 * np.pi, 100)
+        radius = self.radius_outer
+        x = radius * np.cos(theta_1)
+        y = radius * np.sin(theta_1)
+        plt.plot(x,y)
+        
+       
+        #why does this not work here, but works when i put it at the top?
+        #plt.rcParams['font.family'] = 'serif'
+        rc('text', usetex = True)
+        #^^why this only apply to the colorbar
+        
+        plt.title(f'2D Histogram of {component}')
+        plt.xlabel(var_1_name + ' '+ '(kpc)')
+        plt.ylabel(var_2_name + ' '+ '(kpc)')
+        cbar = plt.colorbar()
+        #cbar.set_label(r'$\Sigma_{\star}$['+ str(Units) + ']')
+        cbar.set_label(r'$\Sigma_{\star}$[$M_{\odot}$ $kpc^{-2}$]')
+        plt.savefig(str(component)+"_particle_data.pdf", format="pdf")
+        print("open "+str(component)+"_particle_data.pdf")
+        
+
+    def total_mass(self):
+        
+        s_mass  = self.particle_data['stars_mass']
+        dm_mass = self.particle_data['dm_mass']
+        g_mass  = self.particle_data['gas_mass']
+        
+        s_total_mass  = sum(s_mass)
+        dm_total_mass = sum(dm_mass)
+        g_total_mass  = sum(g_mass)
+        
+        #print('s total mass =', s_total_mass)
+        #print('dm total mass =', dm_total_mass)
+        #print('g total mass =', g_total_mass)
+
+     
+    def mask(self, radius_inner, radius_outer, component):
+
+        self.radius_inner = radius_inner
+        self.radius_outer = radius_outer
+        
+        x_input = component + '_x'
+        y_input = component + '_y'
+        r_input = component + '_r'
+        input_dictionary = {}
+       
+        #Here I am setting a key value pair to the component variable with its corresponding list of values
+        
+        input_dictionary[x_input] = self.particle_data[component+'_x']
+        input_dictionary[y_input] = self.particle_data[component+'_y']
+        input_dictionary[r_input] = np.sqrt(input_dictionary[x_input]**2+input_dictionary[y_input]**2)
+        
+        #the values of the radius of each point is stored in this dictionary
+       
+        print(input_dictionary[r_input])
+        
+        #defining mask to be the r values between r_inner and r_outer (rings)
+        
+        self.mask = (self.radius_inner < input_dictionary[r_input]) & (self.radius_outer > input_dictionary[r_input])
+        print(self.mask)
+
+        
+    def particles_ring(self, component):
+        
+        self.component = component
+        m_variable = 'm_' + component
+        m_dictionary = {}
+        #assigning key(m_component) to corresponding mask of particles within the radius determined above
+        m_dictionary[m_variable] = np.sum(self.mask)
+        print(f'sum of {component} between radius {self.radius_inner} and {self.radius_outer} = '+ str(m_dictionary[m_variable]))
+        
+        
+   
+
+        
+        
+        
+        
+        
+        
+       
+"""
+    def mask(self, radius_inner, radius_outer, component):
+
+        self.radius_inner = radius_inner
+        self.radius_outer = radius_outer
+        
+        x_input = component + '_x'
+        y_input = component + '_y'
+        r_input = component + '_r'
+        x_value = self.particle_data[component+'_x']
+        y_value = self.particle_data[component+'_y']
+        r_input_value = np.sqrt(x_value**2+y_value**2)
+        
+       
+        #Here I am setting a key value pair to the component variable with its corresponding list of values
+        
+        input_dictionary = {}
+        input_dictionary[x_input] = x_value
+        input_dictionary[y_input] = y_value
+        input_dictionary[r_input] = r_input_value
+        
+        #the values of the radius of each point is stored in this dictionary
+        print(input_dictionary[r_input])
+        
+        #defining mask to be the r values between r_inner and r_outer (rings)
+        mask = (self.radius_inner < input_dictionary[r_input]) & (self.radius_outer > input_dictionary[r_input])
+        print(mask)
+"""
+        
+        
+        
+        
+        
+        
+        
+        
+        
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
