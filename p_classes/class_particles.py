@@ -43,8 +43,9 @@ class component_graphs:
         self.particle_data['stars_y'] = np.asarray(f['stars_y'])
         self.particle_data['stars_z'] = np.asarray(f['stars_z'])
         self.particle_data['stars_mass'] = np.asarray(f['stars_mass'])*1e10/self.h
+        self.particle_data['object_Rvir'] = np.asarray(f['object_Rvir'])
+        self.particle_data['time'] = np.asarray(f['time'])
         
-    
         f.close()
   
 #######################Public_Functions#########################
@@ -60,7 +61,7 @@ class component_graphs:
     
         
         #code for the graph
-        norm = colors.LogNorm(vmin=1e4,vmax=1e10)
+        norm = colors.LogNorm(vmin=1e4,vmax=1e9)
         bins = 1024
         cmap = 'nipy_spectral'
         cmap = copy.copy(mpl.cm.get_cmap(cmap))
@@ -100,7 +101,16 @@ class component_graphs:
         rc('text', usetex = True)
         #^^why this only apply to the colorbar
         
-        plt.title(f'2D Histogram of {component}')
+        #renaming components such that it appears capitalized in the graph
+        if component == 'dm':
+            title_name = 'Dark Matter'
+        if component == 'stars':
+            title_name = 'Stars'
+        if component == 'gas':
+            title_name = 'Gas'
+            
+        
+        plt.title(f'2D Histogram of {title_name}')
         plt.xlabel(var_1_name + ' '+ '(kpc)')
         plt.ylabel(var_2_name + ' '+ '(kpc)')
         cbar = plt.colorbar()
@@ -123,6 +133,9 @@ class component_graphs:
         #print('s total mass =', s_total_mass)
         #print('dm total mass =', dm_total_mass)
         #print('g total mass =', g_total_mass)
+    
+    #def star_mask(self):
+        #for
 
      
     def mask(self, radius_inner, radius_outer, component):
@@ -142,15 +155,24 @@ class component_graphs:
         input_dictionary[r_input] = np.sqrt(input_dictionary[x_input]**2+input_dictionary[y_input]**2)
         
         #the values of the radius of each point is stored in this dictionary
-       
-        print(input_dictionary[r_input])
+        print('input dictionary r-input')
+        print((input_dictionary[r_input]))
+        
+        #testing
+        print('length of stars-mass')
+        print(len(self.particle_data['stars_mass']))
+        print('len of input dictionary r-input')
+        print(len(input_dictionary[r_input]))
         
         #defining mask to be the r values between r_inner and r_outer (rings)
         
         self.mask = (self.radius_inner < input_dictionary[r_input]) & (self.radius_outer > input_dictionary[r_input])
-        print(self.mask)
-
+        #print(self.mask)
         
+        
+        #print('hello')
+        #print((self.particle_data['stars_mass']))
+    
     def particles_ring(self, component):
         
         self.component = component
@@ -158,7 +180,80 @@ class component_graphs:
         m_dictionary = {}
         #assigning key(m_component) to corresponding mask of particles within the radius determined above
         m_dictionary[m_variable] = np.sum(self.mask)
-        print(f'sum of {component} between radius {self.radius_inner} and {self.radius_outer} = '+ str(m_dictionary[m_variable]))
+        #print(f'sum of {component} between radius {self.radius_inner} and {self.radius_outer} = '+ str(m_dictionary[m_variable]))
+        
+    def star_mass_ring(self, component):
+        #sums up the mass of stars between rings
+        print(sum(self.particle_data['stars_mass'][self.mask]))
+        
+        
+    def star_mass_radius_plot(self):
+        x_input = 'stars_x'
+        y_input = 'stars_y'
+        r_input = 'stars_r'
+        
+        input_dictionary = {}
+       
+        #Here I am setting a key value pair to the component variable with its corresponding list of values
+        
+        input_dictionary[x_input] = self.particle_data['stars_x']
+        input_dictionary[y_input] = self.particle_data['stars_y']
+        input_dictionary[r_input] = np.sqrt(input_dictionary[x_input]**2+input_dictionary[y_input]**2)
+        
+        
+        
+        #dictionary to store radius key to mass value
+        radius_mass = {}
+        print('joey')
+        for i in range(36043):
+            radius_mass[input_dictionary[r_input][i]] = self.particle_data['stars_mass'][i]
+        
+        keys = list(radius_mass.keys())
+        values = tuple(list(radius_mass.values()))
+        
+        x_values = [pair[0] for pair in values]
+        y_values = [pair[1] for pair in values]
+        plt.figure(figsize=(10, 6))  # Set the size of the figure
+
+        # Create the scatter plot
+        plt.scatter(x_values, y_values, color='blue', label='Data Points')
+
+        # Customize the plot
+        plt.title('Scatter Plot of Radius vs. Mass')
+        plt.xlabel('Radius')
+        plt.ylabel('Mass')
+        plt.legend()
+
+        # Display the plot
+        plt.show()
+         
+         
+         
+        #print(input_dictionary[r_input][36042])
+        #print(self.particle_data['stars_mass'][36042])
+        
+        
+        
+            
+        
+        
+
+        
+       
+        #print('hello1')
+        #print(np.sum(self.mask))
+        #print('hello2')
+        #print(self.particle_data['stars_mass'][self.mask])
+        #print(sum(self.particle_data['stars_mass'][self.mask]))
+        #print('length is',len(self.particle_data['stars_mass'][self.mask]) )
+        #print(len(self.particle_data['stars_mass'][self.mask]))
+        #checking to see the length of the data set checks out :)
+        #print(len(self.particle_data['stars_mass']))
+        #print(len(self.particle_data['stars_x']))
+        #print(len(self.mask))
+        
+        
+        
         
         
    
